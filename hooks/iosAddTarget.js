@@ -151,12 +151,19 @@ function projectPlistJson(context, projectName) {
 
 function getPreferences(context, configXml, projectName) {
   var plist = projectPlistJson(context, projectName);
+  var group = "group." + plist.CFBundleIdentifier + BUNDLE_SUFFIX;
+  if (getCordovaParameter(configXml, 'GROUP_IDENTIFIER') !== "") {
+    group = getCordovaParameter(configXml, 'IOS_GROUP_IDENTIFIER');
+  }
   return [{
     key: '__DISPLAY_NAME__',
     value: projectName
   }, {
     key: '__BUNDLE_IDENTIFIER__',
     value: plist.CFBundleIdentifier + BUNDLE_SUFFIX
+  } ,{
+      key: '__GROUP_IDENTIFIER__',
+      value: group
   }, {
     key: '__BUNDLE_SHORT_VERSION_STRING__',
     value: plist.CFBundleShortVersionString
@@ -279,6 +286,27 @@ module.exports = function (context) {
     files.resource.forEach(function(file) {
       pbxProject.addResourceFile(file.name, {target: target.uuid}, pbxGroupKey);
     });
+
+    //Add development team and provisioning profile
+    var PROVISIONING_PROFILE = getCordovaParameter(configXml, 'SHAREEXT_PROVISIONING_PROFILE');
+    var DEVELOPMENT_TEAM = getCordovaParameter(configXml, 'SHAREEXT_DEVELOPMENT_TEAM');
+    console.log('Adding team', DEVELOPMENT_TEAM, 'and provisoning profile', PROVISIONING_PROFILE);
+    if (PROVISIONING_PROFILE && DEVELOPMENT_TEAM) {
+      var configurations = pbxProject.pbxXCBuildConfigurationSection();
+      for (var key in configurations) {
+        if (typeof configurations[key].buildSettings !== 'undefined') {
+          var buildSettingsObj = configurations[key].buildSettings;
+          if (typeof buildSettingsObj['PRODUCT_NAME'] !== 'undefined') {
+            var productName = buildSettingsObj['PRODUCT_NAME'];
+            if (productName.indexOf('ShareExt') >= 0) {
+              buildSettingsObj['PROVISIONING_PROFILE'] = PROVISIONING_PROFILE;
+              buildSettingsObj['DEVELOPMENT_TEAM'] = DEVELOPMENT_TEAM;
+              console.log('Added signing identities for extension!');
+            }
+          }
+        }
+      }
+    }
 
     // Add a new PBXFrameworksBuildPhase for the Frameworks used by the Share Extension
     // (NotificationCenter.framework, libCordova.a)
